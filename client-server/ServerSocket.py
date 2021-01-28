@@ -15,7 +15,7 @@ class ServerSocket(socket.socket):
         self.hostname = socket.gethostname()
         self.buffer = buffer
         self.clients = {}
-        self.bind((self.hostname, self.port))
+        self.bind(('', self.port))
         self.listen()
 
     def run(self):
@@ -34,12 +34,12 @@ class ServerSocket(socket.socket):
         while 1:
             (clientSock, address) = self.accept()
             print("start recv")
-            name = self.recv(self.buffer)
+            name = clientSock.recv(self.buffer)
             print("end recv")
             id = self.create_id()
-            self.clients[id] = {'name': name, 'addr': clientSock}
+            self.clients[id] = {'name': name.decode(), 'addr': clientSock}
             self.on_client_conect()
-            thread.start_new_thread(self.recive, (self.clients[id],))
+            thread.start_new_thread(self.recive, (id,))
 
     def create_id(self):
         not_found = True
@@ -49,6 +49,7 @@ class ServerSocket(socket.socket):
                 return rand_int
 
     def recive(self, id):
+        print(self.clients)
         client = self.clients[id]['addr']
         while 1:
             data = client.recv(self.buffer)
@@ -56,19 +57,21 @@ class ServerSocket(socket.socket):
             if answer['message'] == 'exit':
                 break
             receiver_name = answer['name']
+            print(receiver_name)
             if receiver_name is None:
                 self.on_message(client, data)
             else:
-                _, values = self.clients.items()
-                if receiver_name not in values:
-                    self.send(client, b"Client is offline")
-                else:
-                    socket = None
-                    for key, value in self.clients.items():
-                        if receiver_name == value['name']:
-                            socket = value['addr']
-                    self.send(socket, answer['message'].encode('utf-8'))
-                    self.send(client, b'Message is sent')
+                isFound = False
+                for value in self.clients.values():
+                    if receiver_name == value['name']:
+                        sendClient = value['addr']
+                        sendClient.send(answer['message'].encode('utf-8'))
+                        client.send(b'Message is sent')
+                        isFound = True
+                        break
+                if not isFound:
+                    client.send(b'User is offline')
+
 
         self.clients.pop(id)
         self.on_client_disconnect()
@@ -80,8 +83,8 @@ class ServerSocket(socket.socket):
 
     def broadcast(self, currentClient, message):
         for client in self.clients:
-            if currentClient is not client:
-                client.send(message)
+            if currentClient is not client['addr']:
+                client['addr'].send(message)
 
     def on_client_conect(self):
         print('User enter to chat')
@@ -90,8 +93,7 @@ class ServerSocket(socket.socket):
         print('User leaves chat')
 
     def on_message(self, client, data):
-        reply = f'{client} :' + data.decode()
-        self.broadcast(client, reply.encode('utf-8'))
+        self.broadcast(client, data.decode('utf-8'))
 
 
 def main():
@@ -101,3 +103,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+#TODO обработать гонку потоков

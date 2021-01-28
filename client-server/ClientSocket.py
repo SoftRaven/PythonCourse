@@ -1,4 +1,4 @@
-import re
+﻿import re
 import socket
 import threading
 import json
@@ -52,10 +52,7 @@ class ClientSocket(socket.socket):
     def read_socket(self):
         while 1:
             data = self.recv(1024).decode('utf-8')
-            result = re.split(r':', data)
-            user = result[0]
-            message = result[1]
-            print(user + ":" + message)
+            print(data)
 
 
 def main():
